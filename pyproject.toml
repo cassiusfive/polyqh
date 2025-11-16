@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "polyqh"
 version = "0.1.0"
-description = "Polymarket quantitative trading and ML pipeline"
+description = "Polymarket market maker powered by ML"
 requires-python = ">=3.9"
 dependencies = [
     "py-clob-client",
