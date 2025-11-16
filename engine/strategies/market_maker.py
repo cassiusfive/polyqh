@@ -61,7 +61,7 @@ class MarketMaker:
             self.feature_names = model_data["feature_names"]
             print(f"Loaded ML model from {model_path}")
             print(f"Model type: {model_data['model_type']}")
-            print(f"Features: {len(self.feature_names)}")
+            print(f"Features: {len(self.feature_names)}\n")
         else:
             print(f"Warning: Model not found at {model_path}, using base spread")
             self.model = None
