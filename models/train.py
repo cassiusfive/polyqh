@@ -17,15 +17,10 @@ from sklearn.preprocessing import StandardScaler
 
 
 class SpreadPriceModel:
-    """Wrapper for spread price prediction models."""
+    """Wrapper for spread price prediction models"""
 
     def __init__(self, model_type: str = "random_forest"):
-        """
-        Initialize model.
-
-        Args:
-            model_type: One of 'linear', 'ridge', 'random_forest', 'gradient_boosting'
-        """
+        """Initialize model"""
         self.model_type = model_type
         self.model = self._create_model(model_type)
         self.scaler = StandardScaler()
@@ -59,17 +54,7 @@ class SpreadPriceModel:
     def train(
         self, X: pd.DataFrame, y: pd.Series, validation_split: float = 0.2
     ) -> Tuple[dict, dict]:
-        """
-        Train the model.
-
-        Args:
-            X: Features
-            y: Target (spread prices)
-            validation_split: Fraction of data for validation
-
-        Returns:
-            Tuple of (train_metrics, val_metrics)
-        """
+        """Train the model"""
         # Store feature names
         self.feature_names = list(X.columns)
 
@@ -93,7 +78,7 @@ class SpreadPriceModel:
         return train_metrics, val_metrics
 
     def _evaluate(self, X, y, split_name: str) -> dict:
-        """Evaluate model and return metrics."""
+        """Evaluate model and return metrics"""
         y_pred = self.model.predict(X)
 
         metrics = {
@@ -154,16 +139,7 @@ class SpreadPriceModel:
 def prepare_features(
     df: pd.DataFrame, target_col: str = "optimal_spread_width"
 ) -> Tuple[pd.DataFrame, pd.Series]:
-    """
-    Prepare features and target from labeled dataset.
-
-    Args:
-        df: Labeled dataset
-        target_col: Name of target column
-
-    Returns:
-        Tuple of (X, y)
-    """
+    """Prepare features and target from labeled dataset."""
     # Drop non-feature columns
     drop_cols = [
         "market_id",
@@ -197,14 +173,7 @@ def train_model(
     model_type: str = "random_forest",
     output_dir: Path = Path("models/saved"),
 ):
-    """
-    Train a spread price prediction model.
-
-    Args:
-        data_file: Path to labeled dataset CSV
-        model_type: Type of model to train
-        output_dir: Directory to save trained model
-    """
+    """Train a spread price prediction model"""
     # Load data
     print(f"Loading data from {data_file}...")
     df = pd.read_csv(data_file)
@@ -246,7 +215,6 @@ def train_model(
 
 
 if __name__ == "__main__":
-    # Train multiple models for comparison
     for model_type in ["linear", "ridge", "random_forest", "gradient_boosting"]:
         print(f"\n{'=' * 60}")
         print(f"Training {model_type} model")
