@@ -16,9 +16,12 @@ async def lifespan(app: FastAPI):
             1,
         )
     )
-    await maker.test()
+
+    trading_task = asyncio.create_task(maker.run())
+
     yield
-    # Shutdown (if needed)
+
+    trading_task.cancel()
 
 
 app = FastAPI(lifespan=lifespan)

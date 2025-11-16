@@ -22,7 +22,6 @@ class MarketMakerConfig:
     max_position: float = 100.0  # Maximum position size
     position_skew_threshold: float = 0.3  # Trigger rebalancing at 30% of max
     base_spread_width: float = 0.05
-    skew_adjustment: float = 0.02  # Additional spread adjustment per unit of skew
 
 
 class MarketMaker:
@@ -32,6 +31,9 @@ class MarketMaker:
         self.buy_order_id = None
         self.sell_order_id = None
         self.active_orders = []
+        self.last_spread_width = None
+        self.last_buy_size = None
+        self.last_sell_size = None
 
     @classmethod
     async def create(cls, config: MarketMakerConfig):
@@ -44,7 +46,7 @@ class MarketMaker:
         """Calculate how far current position deviates from target"""
         if self.position is None:
             return 0.0
-        current_pos = float(self.position.get("size", 0))
+        current_pos = get_position(self.config.market_address)
         return current_pos - self.config.target_position
 
     def needs_rebalancing(self) -> bool:
@@ -53,28 +55,26 @@ class MarketMaker:
         threshold = self.config.max_position * self.config.position_skew_threshold
         return skew > threshold
 
-    def calculate_spread_width(self) -> tuple[float, float]:
+    def spread_changed(self) -> bool:
+        """Check if spread parameters have changed since last update"""
+        spread_width = self.calculate_spread_width()
+        buy_size, sell_size = self.calculate_order_sizes()
+
+        if self.last_spread_width is None:
+            return True
+
+        # Check if any parameter has changed
+        spread_changed = abs(spread_width - self.last_spread_width) > 0.0001
+        buy_size_changed = abs(buy_size - self.last_buy_size) > 0.01
+        sell_size_changed = abs(sell_size - self.last_sell_size) > 0.01
+
+        return spread_changed or buy_size_changed or sell_size_changed
+
+    def calculate_spread_width(self) -> float:
         """
-        Calculate asymmetric spread based on position skew.
-        If we're long, widen the buy spread and tighten the sell spread.
-        If we're short, do the opposite.
+        Calculate symmetric spread based on base width.
         """
-        base_width = self.config.base_spread_width
-        skew = self.get_position_skew()
-        skew_ratio = skew / self.config.max_position
-
-        # Adjust spreads based on inventory
-        buy_adjustment = skew_ratio * self.config.skew_adjustment
-        sell_adjustment = -skew_ratio * self.config.skew_adjustment
-
-        buy_width = base_width + buy_adjustment
-        sell_width = base_width + sell_adjustment
-
-        # Ensure spreads don't become negative
-        buy_width = max(0.01, buy_width)
-        sell_width = max(0.01, sell_width)
-
-        return buy_width, sell_width
+        return self.config.base_spread_width
 
     def calculate_order_sizes(self) -> tuple[float, float]:
         """
@@ -92,19 +92,17 @@ class MarketMaker:
         buy_size = base_size * buy_size_multiplier
         sell_size = base_size * sell_size_multiplier
 
-        return round(buy_size, 2), round(sell_size, 2)
+        return max(5, round(buy_size)), max(5, round(sell_size))
 
     async def cancel_all_orders(self):
         """Cancel all active orders"""
-        for order in self.active_orders:
-            try:
-                client.cancel_order(order["id"])
-            except Exception as e:
-                print(f"Error canceling order {order['id']}: {e}")
-
-        self.buy_order_id = None
-        self.sell_order_id = None
-        self.active_orders = []
+        try:
+            client.cancel_market_orders(asset_id=self.config.token_id)
+            self.buy_order_id = None
+            self.sell_order_id = None
+            self.active_orders = []
+        except Exception as e:
+            print(f"Error canceling orders: {e}")
 
     async def rebalance_position(self):
         """Execute rebalancing trade to move closer to target position"""
@@ -141,19 +139,25 @@ class MarketMaker:
             await self.rebalance_position()
             await sleep(5)  # Wait for rebalance order to execute
             await self.update_state()
+            # After rebalancing, force new orders
+            self.last_spread_width = None
 
-        # Cancel existing orders and place new ones with updated spreads
-        await self.cancel_all_orders()
-        await self.place_market_making_orders()
+        # Only cancel and replace orders if spread parameters have changed
+        if self.spread_changed():
+            print("Spread parameters changed, updating orders")
+            await self.cancel_all_orders()
+            await self.place_market_making_orders()
+        else:
+            print("Spread unchanged, keeping existing orders")
 
     async def place_market_making_orders(self):
         """Place buy and sell orders with calculated spreads and sizes"""
         midpoint = await self.get_midpoint()
-        buy_width, sell_width = self.calculate_spread_width()
+        spread_width = self.calculate_spread_width()
         buy_size, sell_size = self.calculate_order_sizes()
 
-        buy_price = midpoint - buy_width
-        sell_price = midpoint + sell_width
+        buy_price = midpoint - spread_width
+        sell_price = midpoint + spread_width
 
         print(
             f"Placing orders - Buy: {buy_size}@{buy_price:.4f}, Sell: {sell_size}@{sell_price:.4f}"
@@ -163,8 +167,16 @@ class MarketMaker:
             buy_order = self.place_order(buy_price, buy_size, BUY)
             sell_order = self.place_order(sell_price, sell_size, SELL)
 
-            self.buy_order_id = buy_order["orderId"]
-            self.sell_order_id = sell_order["orderId"]
+            print(buy_order)
+            print(sell_order)
+
+            self.buy_order_id = buy_order["orderID"]  # pyright: ignore
+            self.sell_order_id = sell_order["orderID"]  # pyright: ignore
+
+            # Save current spread parameters
+            self.last_spread_width = spread_width
+            self.last_buy_size = buy_size
+            self.last_sell_size = sell_size
         except Exception as e:
             print(f"Error placing orders: {e}")
 
@@ -186,20 +198,19 @@ class MarketMaker:
 
     async def get_midpoint(self) -> float:
         """Get current market midpoint"""
-        return float(client.get_midpoint(self.config.token_id)["mid"])
+        return float(client.get_midpoint(self.config.token_id)["mid"])  # pyright: ignore
 
     async def get_spread(self):
         """Get current bid/ask spread (legacy method)"""
         midpoint = await self.get_midpoint()
-        buy_width, sell_width = self.calculate_spread_width()
-        return (midpoint - buy_width, midpoint + sell_width)
+        spread_width = self.calculate_spread_width()
+        return (midpoint - spread_width, midpoint + spread_width)
 
     def place_order(self, price, size, side):
         """Place an order on the market"""
         order = OrderArgs(self.config.token_id, price=price, size=size, side=side)
         signed = client.create_order(order)
-        return client.post_order(signed, OrderType.GTC)
+        return client.post_order(signed, OrderType.GTC)  # pyright: ignore
 
     async def test(self):
         """Test method for initial order placement"""
-        await self.place_market_making_orders()
