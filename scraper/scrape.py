@@ -38,7 +38,7 @@ def get_market(market_id: int):
     """Fetch a market by id"""
     print(f"Fetching market {market_id}...")
 
-    response = requests.get(f"{GAMMA_API}/markets/{id}")
+    response = requests.get(f"{GAMMA_API}/markets/{market_id}")
     response.raise_for_status()
     return response.json()
 

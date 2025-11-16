@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Polymarket market maker powered by ML"
 requires-python = ">=3.9"
 dependencies = [
+    "fastapi[standard]",
     "py-clob-client",
     "python-dotenv",
     "pandas",
