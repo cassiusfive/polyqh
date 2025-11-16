@@ -20,9 +20,9 @@ def get_all_markets():
         "closed": False,
         "order": "createdAt",
         "ascending": False,
-        "limit": 100,
-        "liquidity_num_min": 500_000,
-        "volume_num_min": 100_000,
+        "limit": 1000,
+        "liquidity_num_min": 100_000,
+        "volume_num_min": 50_000,
     }
 
     response = requests.get(f"{GAMMA_API}/markets", params=params)
@@ -67,7 +67,7 @@ def get_market_details(market):
         f"{DATA_API}/trades",
         params={
             "market": condition_id,
-            "limit": 100,
+            "limit": 1000,
         },
     )
     response.raise_for_status()
