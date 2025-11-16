@@ -59,13 +59,9 @@ class MarketMaker:
             self.model = model_data["model"]
             self.scaler = model_data["scaler"]
             self.feature_names = model_data["feature_names"]
-            print(f"Loaded ML model from {model_path}")
-            print(f"Model type: {model_data['model_type']}")
-<<<<<<< HEAD
-            print(f"Features: {len(self.feature_names)}")
-=======
-            print(f"Features: {len(self.feature_names)}\n")
->>>>>>> main
+            print(f"\nLoaded ML model from {model_path}")
+            print(f"Model type: {model_data['model_type']}\n")
+
         else:
             print(f"Warning: Model not found at {model_path}, using base spread")
             self.model = None
@@ -137,18 +133,12 @@ class MarketMaker:
             # Ensure features are in the correct order and all expected features are present
             missing_features = set(self.feature_names) - set(features_df.columns)
             if missing_features:
-                print(f"Warning: Missing features: {missing_features}")
                 # Add missing features with default values (0)
                 for feat in missing_features:
                     features_df[feat] = 0.0
 
             # Reorder to match training feature order
             features_df = features_df[self.feature_names]
-
-            # Debug: Print feature counts
-            print(
-                f"Features extracted: {len(features_df.columns)}, Expected: {len(self.feature_names)}"
-            )
 
             # Scale features using the saved scaler
             features_scaled = self.scaler.transform(features_df)
@@ -262,8 +252,8 @@ class MarketMaker:
             buy_order = self.place_order(buy_price, buy_size, BUY)
             sell_order = self.place_order(sell_price, sell_size, SELL)
 
-            print(buy_order)
-            print(sell_order)
+            print(f"Buy order: {buy_order['orderID']}")
+            print(f"Sell order: {sell_order['orderID']}\n")
 
             self.buy_order_id = buy_order["orderID"]  # pyright: ignore
             self.sell_order_id = sell_order["orderID"]  # pyright: ignore
