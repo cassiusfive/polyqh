@@ -1,7 +1,14 @@
+import sys
 from asyncio import sleep
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
+import joblib
+import numpy as np
+import pandas as pd
+import requests
+from core.polymarket import client, get_position
 from py_clob_client.clob_types import (
     BalanceAllowanceParams,
     OpenOrderParams,
@@ -10,11 +17,15 @@ from py_clob_client.clob_types import (
 )
 from py_clob_client.order_builder.constants import BUY, SELL
 
-from core.polymarket import client, get_position
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from labeler.label_data import extract_orderbook_features, extract_trade_features
+from scraper.scrape import get_market, get_market_details
 
 
 @dataclass
 class MarketMakerConfig:
+    market_id: int
     market_address: str
     token_id: str
     update_interval: int
@@ -34,6 +45,15 @@ class MarketMaker:
         self.last_spread_width = None
         self.last_buy_size = None
         self.last_sell_size = None
+
+        # Load ML model
+        model_path = Path(__file__).parent.parent.parent / "models" / "best_model.joblib"
+        if model_path.exists():
+            self.model = joblib.load(model_path)
+            print(f"Loaded ML model from {model_path}")
+        else:
+            print(f"Warning: Model not found at {model_path}, using base spread")
+            self.model = None
 
     @classmethod
     async def create(cls, config: MarketMakerConfig):
@@ -70,11 +90,45 @@ class MarketMaker:
 
         return spread_changed or buy_size_changed or sell_size_changed
 
-    def calculate_spread_width(self) -> float:
+    def predict_spread_width(self) -> float:
         """
-        Calculate symmetric spread based on base width.
+        Predict optimal spread width using ML model.
+        Falls back to base spread if model unavailable or prediction fails.
         """
-        return self.config.base_spread_width
+        if self.model is None:
+            return self.config.base_spread_width
+
+        try:
+            # Fetch current market data
+            market = get_market(self.config.market_id)
+            market_data = get_market_details(market)
+
+            # Extract features using the same functions as training
+            orderbook = market_data["orderbooks"][0] if market_data["orderbooks"] else {}
+            trades = market_data["trades"]
+
+            orderbook_features = extract_orderbook_features(orderbook)
+            trade_features = extract_trade_features(trades)
+
+            if not orderbook_features:
+                raise ValueError("Failed to extract orderbook features")
+
+            # Combine features
+            features = {**orderbook_features, **trade_features}
+            features_df = pd.DataFrame([features])
+
+            # Predict optimal spread width
+            prediction = self.model.predict(features_df)[0]
+
+            # Clamp prediction to reasonable range (0.1% to 20%)
+            spread_width = max(0.001, min(0.20, prediction))
+
+            print(f"ML predicted spread: {spread_width:.4f}")
+            return spread_width
+
+        except Exception as e:
+            print(f"Error predicting spread, using base: {e}")
+            return self.config.base_spread_width
 
     def calculate_order_sizes(self) -> tuple[float, float]:
         """
@@ -203,7 +257,7 @@ class MarketMaker:
     async def get_spread(self):
         """Get current bid/ask spread (legacy method)"""
         midpoint = await self.get_midpoint()
-        spread_width = self.calculate_spread_width()
+        spread_width = self.predict_spread_width()
         return (midpoint - spread_width, midpoint + spread_width)
 
     def place_order(self, price, size, side):

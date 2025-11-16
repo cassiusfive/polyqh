@@ -34,7 +34,16 @@ def get_all_markets():
     return markets
 
 
-def get_market(market):
+def get_market(market_id: int):
+    """Fetch a market by id"""
+    print(f"Fetching market {market_id}...")
+
+    response = requests.get(f"{GAMMA_API}/markets/{id}")
+    response.raise_for_status()
+    return response.json()
+
+
+def get_market_details(market):
     """Get orderbook snapshot and trades for each token in the market"""
     print("Fetching market data...")
 
@@ -77,7 +86,7 @@ def scrape_markets():
     markets = get_all_markets()
 
     for market in markets:
-        data = get_market(market)
+        data = get_market_details(market)
         out_file = OUTPUT_DIR / f"{market['conditionId']}.json"
         out_file.write_text(json.dumps(data, indent=2))
 
