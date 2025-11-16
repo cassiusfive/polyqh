@@ -14,7 +14,6 @@ DATA_API = "https://data-api.polymarket.com"
 
 def get_all_markets():
     """Fetch all markets"""
-    print("Fetching markets...")
 
     params = {
         "closed": False,
@@ -29,14 +28,13 @@ def get_all_markets():
     response.raise_for_status()
     markets = response.json()
 
-    print(f"Found {len(markets)} markets\n")
+    print(f"Found {len(markets)} markets")
 
     return markets
 
 
 def get_market(market_id: int):
     """Fetch a market by id"""
-    print(f"Fetching market {market_id}...")
 
     response = requests.get(f"{GAMMA_API}/markets/{market_id}")
     response.raise_for_status()
@@ -45,22 +43,17 @@ def get_market(market_id: int):
 
 def get_market_details(market):
     """Get orderbook snapshot and trades for each token in the market"""
-    print("Fetching market data...")
 
     orderbooks = []
 
     condition_id = market["conditionId"]
     token_ids = json.loads(market["clobTokenIds"])
 
-    print("    Fetching orderbooks...")
     for token_id in token_ids:
         response = requests.get(f"{CLOB_API}/book", params={"token_id": token_id})
         response.raise_for_status()
         orderbook = response.json()
         orderbooks.append(orderbook)
-
-    print(f"    Found {len(orderbooks)} orderbooks")
-    print("    Fetching recent trades...")
 
     trades = []
     response = requests.get(
@@ -72,7 +65,6 @@ def get_market_details(market):
     )
     response.raise_for_status()
     trades = response.json()
-    print(f"    Found {len(trades)} trades")
 
     return {
         "market_info": market,
@@ -90,7 +82,7 @@ def scrape_markets():
         out_file = OUTPUT_DIR / f"{market['conditionId']}.json"
         out_file.write_text(json.dumps(data, indent=2))
 
-        print(f"    Saved → {out_file}\n")
+    print(f"Saved {len(markets)} to data/raw")
 
 
 if __name__ == "__main__":

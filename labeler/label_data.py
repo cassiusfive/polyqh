@@ -143,11 +143,8 @@ def label_all_data(
         print(f"No data files found in {data_dir}")
         return
 
-    print(f"Processing {len(data_files)} market data files...")
-
     labeled_data = []
     for data_file in data_files:
-        print(f"Processing {data_file.name}...")
         features = label_market_data(data_file, spread_method)
 
         if features:
@@ -160,10 +157,6 @@ def label_all_data(
     df = pd.DataFrame(labeled_data)
 
     df = df.dropna(subset=["optimal_spread_width"])
-
-    print(f"\nLabeled dataset: {len(df)} samples")
-    print(f"Columns: {list(df.columns)}")
-    print(f"\nSaving to {output_file}...")
 
     df.to_csv(output_file, index=False)
     print(f"Saved {len(df)} labeled samples to {output_file}")

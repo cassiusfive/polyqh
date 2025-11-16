@@ -68,7 +68,7 @@ class SpreadPriceModel:
         X_val_scaled = self.scaler.transform(X_val)
 
         # Train model
-        print(f"Training {self.model_type} model...")
+        print(f"\nTraining {self.model_type} model...")
         self.model.fit(X_train_scaled, y_train)
 
         # Evaluate
@@ -87,10 +87,10 @@ class SpreadPriceModel:
             "r2": r2_score(y, y_pred),
         }
 
-        print(f"\n{split_name.upper()} Metrics:")
+        print(f"{split_name.upper()} Metrics:")
         print(f"  MAE:  {metrics['mae']:.6f}")
         print(f"  RMSE: {metrics['rmse']:.6f}")
-        print(f"  R²:   {metrics['r2']:.4f}")
+        print(f"  R²:   {metrics['r2']:.4f}\n")
 
         return metrics
 
@@ -162,8 +162,8 @@ def prepare_features(
     X = X[mask]
     y = y[mask]
 
-    print(f"Features: {len(feature_cols)} columns")
     print(f"Samples: {len(X)} rows")
+    print(f"Features: {len(feature_cols)} columns")
 
     return X, y
 
@@ -175,9 +175,7 @@ def train_model(
 ):
     """Train a spread price prediction model"""
     # Load data
-    print(f"Loading data from {data_file}...")
     df = pd.read_csv(data_file)
-    print(f"Loaded {len(df)} samples")
 
     # Prepare features
     X, y = prepare_features(df)
@@ -185,12 +183,6 @@ def train_model(
     # Train model
     model = SpreadPriceModel(model_type=model_type)
     train_metrics, val_metrics = model.train(X, y)
-
-    # Feature importance
-    importance = model.get_feature_importance()
-    if importance is not None:
-        print("\nTop 10 Most Important Features:")
-        print(importance.head(10))
 
     # Save model
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -215,10 +207,7 @@ def train_model(
 
 
 if __name__ == "__main__":
-    for model_type in ["linear", "ridge", "random_forest", "gradient_boosting"]:
-        print(f"\n{'=' * 60}")
-        print(f"Training {model_type} model")
-        print(f"{'=' * 60}")
+    for model_type in ["random_forest"]:
         try:
             train_model(model_type=model_type)
         except Exception as e:
