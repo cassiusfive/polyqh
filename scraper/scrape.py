@@ -12,9 +12,9 @@ CLOB_API = "https://clob.polymarket.com"
 DATA_API = "https://data-api.polymarket.com"
 
 
-def scrape_all_markets():
-    """Scrape orderbook data for markets (simplified for hackathon)"""
-    print("Fetching markets from Gamma API...")
+def get_all_markets():
+    """Fetch all markets"""
+    print("Fetching markets...")
 
     params = {
         "closed": False,
@@ -29,64 +29,60 @@ def scrape_all_markets():
     response.raise_for_status()
     markets = response.json()
 
-    print(f"Found {len(markets)} markets (liquidity > $5k, volume > $1k)")
+    print(f"Found {len(markets)} markets\n")
 
-    for m in markets:
-        condition_id = m["conditionId"]
-        question = m["question"]
-        clob_token_ids = m.get("clobTokenIds", "")
-        token_ids = json.loads(clob_token_ids) if clob_token_ids else []
-
-        print(f"\nMarket: {question}")
-        print(f"Condition ID: {condition_id}")
-
-        scrape_market(condition_id, token_ids, m)
+    return markets
 
 
-def scrape_market(condition_id: str, token_ids: list, market_info: dict):
+def get_market(market):
     """Get orderbook snapshot and trades for each token in the market"""
+    print("Fetching market data...")
 
     orderbooks = []
 
-    for i, token_id in enumerate(token_ids):
-        outcome = f"Outcome {i + 1}"
+    condition_id = market["conditionId"]
+    token_ids = json.loads(market["clobTokenIds"])
 
-        print(f"  Fetching orderbook for {outcome}...")
+    print("    Fetching orderbooks...")
+    for token_id in token_ids:
         response = requests.get(f"{CLOB_API}/book", params={"token_id": token_id})
         response.raise_for_status()
         orderbook = response.json()
         orderbooks.append(orderbook)
-        print("    ✓ Got orderbook")
 
-    # Fetch recent trades for this market
-    print(f"  Fetching recent trades...")
+    print(f"    Found {len(orderbooks)} orderbooks")
+    print("    Fetching recent trades...")
+
     trades = []
-    try:
-        response = requests.get(
-            f"{DATA_API}/trades",
-            params={
-                "market": condition_id,
-                "limit": 100,  # Get last 100 trades
-            },
-        )
-        response.raise_for_status()
-        trades = response.json()
-        print(f"    ✓ Got {len(trades)} trades")
-    except Exception as e:
-        print(f"    ⚠ Could not fetch trades: {e}")
+    response = requests.get(
+        f"{DATA_API}/trades",
+        params={
+            "market": condition_id,
+            "limit": 100,
+        },
+    )
+    response.raise_for_status()
+    trades = response.json()
+    print(f"    Found {len(trades)} trades")
 
-    out = {
-        "market_info": market_info,
+    return {
+        "market_info": market,
         "orderbooks": orderbooks,
         "trades": trades,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now().isoformat(),
     }
 
-    out_file = OUTPUT_DIR / f"{condition_id}.json"
-    out_file.write_text(json.dumps(out, indent=2))
 
-    print(f"\n✓ Saved → {out_file}")
+def scrape_markets():
+    markets = get_all_markets()
+
+    for market in markets:
+        data = get_market(market)
+        out_file = OUTPUT_DIR / f"{market['conditionId']}.json"
+        out_file.write_text(json.dumps(data, indent=2))
+
+        print(f"    Saved → {out_file}\n")
 
 
 if __name__ == "__main__":
-    scrape_all_markets()
+    scrape_markets()

@@ -25,7 +25,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["client", "scraper", "labeling", "models"]
+packages = ["client", "scraper", "labeler", "models"]
 
 [tool.black]
 line-length = 100

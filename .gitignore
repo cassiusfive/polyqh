@@ -1,3 +1,8 @@
+data/raw/*
+data/labeled_dataset.csv
+models/saved/*
+!models/saved/.gitkeep
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
