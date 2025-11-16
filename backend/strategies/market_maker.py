@@ -47,13 +47,26 @@ class MarketMaker:
         self.last_sell_size = None
 
         # Load ML model
-        model_path = Path(__file__).parent.parent.parent / "models" / "best_model.joblib"
+        model_path = (
+            Path(__file__).parent.parent.parent
+            / "models"
+            / "saved"
+            / "random_forest_spread_model.joblib"
+        )
         if model_path.exists():
-            self.model = joblib.load(model_path)
+            model_data = joblib.load(model_path)
+            # Extract model and scaler from saved dictionary
+            self.model = model_data["model"]
+            self.scaler = model_data["scaler"]
+            self.feature_names = model_data["feature_names"]
             print(f"Loaded ML model from {model_path}")
+            print(f"Model type: {model_data['model_type']}")
+            print(f"Features: {len(self.feature_names)}")
         else:
             print(f"Warning: Model not found at {model_path}, using base spread")
             self.model = None
+            self.scaler = None
+            self.feature_names = None
 
     @classmethod
     async def create(cls, config: MarketMakerConfig):
@@ -77,7 +90,7 @@ class MarketMaker:
 
     def spread_changed(self) -> bool:
         """Check if spread parameters have changed since last update"""
-        spread_width = self.calculate_spread_width()
+        spread_width = self.predict_spread_width()
         buy_size, sell_size = self.calculate_order_sizes()
 
         if self.last_spread_width is None:
@@ -117,8 +130,27 @@ class MarketMaker:
             features = {**orderbook_features, **trade_features}
             features_df = pd.DataFrame([features])
 
-            # Predict optimal spread width
-            prediction = self.model.predict(features_df)[0]
+            # Ensure features are in the correct order and all expected features are present
+            missing_features = set(self.feature_names) - set(features_df.columns)
+            if missing_features:
+                print(f"Warning: Missing features: {missing_features}")
+                # Add missing features with default values (0)
+                for feat in missing_features:
+                    features_df[feat] = 0.0
+
+            # Reorder to match training feature order
+            features_df = features_df[self.feature_names]
+
+            # Debug: Print feature counts
+            print(
+                f"Features extracted: {len(features_df.columns)}, Expected: {len(self.feature_names)}"
+            )
+
+            # Scale features using the saved scaler
+            features_scaled = self.scaler.transform(features_df)
+
+            # Predict optimal spread width (use numpy array to avoid warning)
+            prediction = self.model.predict(features_scaled)[0]
 
             # Clamp prediction to reasonable range (0.1% to 20%)
             spread_width = max(0.001, min(0.20, prediction))
@@ -127,7 +159,10 @@ class MarketMaker:
             return spread_width
 
         except Exception as e:
+            import traceback
+
             print(f"Error predicting spread, using base: {e}")
+            print(traceback.format_exc())  # Add full traceback for debugging
             return self.config.base_spread_width
 
     def calculate_order_sizes(self) -> tuple[float, float]:
@@ -207,8 +242,10 @@ class MarketMaker:
     async def place_market_making_orders(self):
         """Place buy and sell orders with calculated spreads and sizes"""
         midpoint = await self.get_midpoint()
-        spread_width = self.calculate_spread_width()
+        spread_width = self.predict_spread_width()
         buy_size, sell_size = self.calculate_order_sizes()
+
+        print("Predicted spread width: ", spread_width)
 
         buy_price = midpoint - spread_width
         sell_price = midpoint + spread_width
