@@ -187,7 +187,7 @@ export default function Home() {
 
         {/* Loading State */}
         {loading ? (
-          <div className="text-center py-12 bg-white rounded-lg border">
+          <div className="w-full h-full flex items-center justify-center pt-72">
             <p className="text-gray-500">Loading portfolio data...</p>
           </div>
         ) : (
