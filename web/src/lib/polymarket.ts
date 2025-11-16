@@ -125,7 +125,7 @@ export async function getOrderBook(tokenId: string) {
 export async function getTopMarkets() {
   try {
     const response = await fetch(
-      `https://gamma-api.polymarket.com/markets?limit=100&closed=false&order=volume1wk&ascending=false`,
+      `https://gamma-api.polymarket.com/markets?limit=1000&order=volume24hr&ascending=false&closed=false`,
     );
 
     if (!response.ok) {
